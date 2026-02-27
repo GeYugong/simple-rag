@@ -1,10 +1,10 @@
 ﻿import json
+import pickle
 from pathlib import Path
 from typing import Dict, List
 
 import numpy as np
 from scipy.sparse import load_npz
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 ROOT = Path(__file__).resolve().parent.parent
 MATRIX_PATH = ROOT / "data" / "index" / "tfidf_matrix.npz"
@@ -12,31 +12,41 @@ VOCAB_PATH = ROOT / "data" / "index" / "tfidf_vocab.json"
 IDF_PATH = ROOT / "data" / "index" / "tfidf_idf.npy"
 META_PATH = ROOT / "data" / "index" / "meta.json"
 PARAMS_PATH = ROOT / "data" / "index" / "index_params.json"
+VECTORIZER_PATH = ROOT / "data" / "index" / "tfidf_vectorizer.pkl"
 
 
 def load_index_and_meta():
-    if not MATRIX_PATH.exists() or not VOCAB_PATH.exists() or not IDF_PATH.exists() or not META_PATH.exists() or not PARAMS_PATH.exists():
-        raise RuntimeError("Index not found. Run: python src/ingest.py")
+    if (
+        not MATRIX_PATH.exists()
+        or not VOCAB_PATH.exists()
+        or not IDF_PATH.exists()
+        or not META_PATH.exists()
+        or not PARAMS_PATH.exists()
+        or not VECTORIZER_PATH.exists()
+    ):
+        raise RuntimeError("Index not found or incomplete. Run: python src/ingest.py")
 
     matrix = load_npz(str(MATRIX_PATH)).tocsr()
-    vocab = json.loads(VOCAB_PATH.read_text(encoding="utf-8"))
-    idf = np.load(str(IDF_PATH)).astype("float32")
     meta = json.loads(META_PATH.read_text(encoding="utf-8"))
-    return matrix, vocab, idf, meta
+    with VECTORIZER_PATH.open("rb") as f:
+        vectorizer = pickle.load(f)
+    return matrix, vectorizer, meta
 
 
-def retrieve(query: str, k: int = 4) -> List[Dict]:
-    matrix, vocab, idf, meta = load_index_and_meta()
-
-    vectorizer = TfidfVectorizer(lowercase=True, ngram_range=(1, 2), vocabulary=vocab)
-    vectorizer.idf_ = idf
-    vectorizer._tfidf.idf_ = idf
+def retrieve(query: str, k: int = 4, min_score: float = 1e-9) -> List[Dict]:
+    matrix, vectorizer, meta = load_index_and_meta()
 
     q = vectorizer.transform([query])
     scores = (matrix @ q.T).toarray().ravel()
 
-    k = max(1, min(k, scores.shape[0]))
-    top_idx = np.argpartition(-scores, k - 1)[:k]
+    positive_idx = np.where(scores > min_score)[0]
+    if positive_idx.size == 0:
+        return []
+
+    k = max(1, min(k, positive_idx.size))
+    candidate_scores = scores[positive_idx]
+    top_local = np.argpartition(-candidate_scores, k - 1)[:k]
+    top_idx = positive_idx[top_local]
     top_idx = top_idx[np.argsort(-scores[top_idx])]
 
     results = []

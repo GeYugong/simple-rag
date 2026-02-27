@@ -1,6 +1,11 @@
-# simple-rag
+﻿# RAG-A
 
 一个最小可运行的 RAG 示例项目（当前为离线 TF-IDF 检索版本，不依赖外部模型下载）。
+
+> 说明：这个项目旨在辅助理解 RAG 的核心原理与流程（读文档、切分、检索、拼接上下文），
+> 并不是完整生产级 RAG。当前实现主要覆盖 R（Retrieval），G（Generation）仅用 `naive_generate_answer` 做演示拼接，
+> 没有接入真实 LLM 生成能力。
+> 同时，项目当前从索引构建到检索问答演示均可在本地离线完成，完全不需要接入任何 API。
 
 ## 1. 项目目标
 
@@ -45,6 +50,7 @@ python src/ingest.py
 - `tfidf_matrix.npz`
 - `tfidf_vocab.json`
 - `tfidf_idf.npy`
+- `tfidf_vectorizer.pkl`
 - `meta.json`
 - `index_params.json`
 
@@ -57,16 +63,16 @@ python src/rag.py
 然后输入问题，例如：
 
 ```text
-RAG 为什么能减少胡说？
+RAG 为什么能减少幻觉？
 ```
 
-程序会输出 top-k 检索片段和分数。
+程序会输出 top-k 检索片段和分数；当所有相关分数为 0 时会返回“没有检索到内容”。
 
 ## 7. 常见问题
 
-### 7.1 报错：`Index not found. Run: python src/ingest.py`
+### 7.1 报错：`Index not found or incomplete. Run: python src/ingest.py`
 
-说明你还没构建索引，先执行：
+说明索引缺失或版本不完整，重新执行：
 
 ```powershell
 python src/ingest.py
@@ -89,7 +95,7 @@ chcp 65001
 ## 8. 项目结构
 
 ```text
-simple-rag/
+RAG-A/
 ├─ data/
 │  ├─ docs/          # 文档输入
 │  └─ index/         # ingest 生成的索引文件

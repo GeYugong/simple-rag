@@ -1,4 +1,5 @@
 ﻿import json
+import pickle
 from pathlib import Path
 from typing import Dict, List
 
@@ -14,6 +15,7 @@ VOCAB_PATH = OUT_DIR / "tfidf_vocab.json"
 IDF_PATH = OUT_DIR / "tfidf_idf.npy"
 META_PATH = OUT_DIR / "meta.json"
 PARAMS_PATH = OUT_DIR / "index_params.json"
+VECTORIZER_PATH = OUT_DIR / "tfidf_vectorizer.pkl"
 
 
 def read_all_docs(doc_dir: Path) -> List[Dict]:
@@ -63,14 +65,27 @@ def main():
     VOCAB_PATH.write_text(json.dumps(vocab, ensure_ascii=False), encoding="utf-8")
     np.save(str(IDF_PATH), vectorizer.idf_.astype("float32"))
     META_PATH.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    with VECTORIZER_PATH.open("wb") as f:
+        pickle.dump(vectorizer, f)
+
     PARAMS_PATH.write_text(
-        json.dumps({"kind": "tfidf", "rows": int(matrix.shape[0]), "cols": int(matrix.shape[1])}, ensure_ascii=False, indent=2),
+        json.dumps(
+            {
+                "kind": "tfidf",
+                "rows": int(matrix.shape[0]),
+                "cols": int(matrix.shape[1]),
+                "vectorizer_path": str(VECTORIZER_PATH.relative_to(ROOT)),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
 
     print("Ingest done.")
     print(f"Matrix: {MATRIX_PATH}")
     print(f"Meta: {META_PATH}")
+    print(f"Vectorizer: {VECTORIZER_PATH}")
     print(f"Chunks: {len(meta)}")
 
 
